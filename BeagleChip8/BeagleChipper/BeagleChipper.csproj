@@ -3,10 +3,18 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp1.1</TargetFramework>
+    <PostBuildEvent>copy /Y "D:\Documents\Projects\BeagleChip8\BeagleChip8\BeagleSdl\Binaries\Debug\x64\SDL2.dll" "D:\Documents\Projects\BeagleChip8\BeagleChip8\BeagleChipper\bin\debug\netcoreapp1.1\SDL2.dll"</PostBuildEvent>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BeagleSdl\BeagleSdl.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Space Invaders.ch8">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
