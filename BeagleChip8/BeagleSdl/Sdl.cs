@@ -54,18 +54,12 @@ namespace BeagleSdl
     {
         private const string SdlDynamicLibraryName = "SDL2.dll";
 
-        /*
-         * 
-         */
         [DllImport(SdlDynamicLibraryName, EntryPoint = "SDL_Init", CallingConvention = CallingConvention.Cdecl)]
         public static extern int Init(int flags);
 
         [DllImport(SdlDynamicLibraryName, EntryPoint = "SDL_Quit", CallingConvention = CallingConvention.Cdecl)]
         public static extern void Quit();
 
-        /*
-         * 
-         */
         [DllImport(SdlDynamicLibraryName, EntryPoint = "SDL_CreateWindow", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr CreateWindow(string title, int x, int y, int w, int h, int flags);
 

@@ -3,6 +3,41 @@ using System.IO;
 using BeagleChipper.Models;
 using BeagleSdl;
 
+/*
+ushort draw1 = 0xF029;
+HandleOperationCode(draw1);
+
+Registers[4] = 0;
+Registers[5] = 0;
+
+ushort drawingOp1 = 0xD455;
+HandleOperationCode(drawingOp1);
+
+ushort draw2 = 0xF129;
+HandleOperationCode(draw2);
+
+Registers[4] = 5;
+Registers[5] = 0;
+
+HandleOperationCode(drawingOp1);
+
+ushort draw3 = 0xF229;
+HandleOperationCode(draw3);
+
+Registers[4] = 20;
+Registers[5] = 0;
+
+HandleOperationCode(drawingOp1);
+
+ushort draw4 = 0xF329;
+HandleOperationCode(draw4);
+
+Registers[4] = 30;
+Registers[5] = 0;
+
+HandleOperationCode(drawingOp1);
+*/
+
 namespace BeagleChipper
 {
     class Program
@@ -127,7 +162,7 @@ namespace BeagleChipper
             Array.Copy(Fontset, Memory, Fontset.Length);
 
             // Load program
-            LoadProgram("Space Invaders.ch8", Memory);
+            LoadProgram("INVADERS.ch8", Memory);
 
             // Initialize SDL
             Sdl.Init((int)InitializationFlags.Video);
@@ -158,8 +193,8 @@ namespace BeagleChipper
             double currentTime = Sdl.GetTicks() / 1000.0;
             double accumulator = 0.0;
 
-            SDLRect pixel = new SDLRect { H = 10, W = 10, X = 32, Y = 32 };
-            
+            SDLRect pixel = new SDLRect { H = 10, W = 10, X = 0, Y = 0 };
+
             bool isRunning = true;
             while (isRunning)
             {
@@ -178,21 +213,36 @@ namespace BeagleChipper
 
                 while (accumulator >= dt)
                 {
+                    ExecuteCycle();
+
+                    Sdl.RenderClear(mainRenderer);
+
+                    Sdl.SetRenderDrawColor(mainRenderer, 255, 255, 255, 255);
+
+                    for (int y = 0; y < 32; y++)
+                    {
+                        for (int x = 0; x < 64; x++)
+                        {
+                            byte pixelValue = DisplayMemory[(y * 64) + x];
+
+                            if (pixelValue == 1)
+                            {
+                                pixel.X = x * 10;
+                                pixel.Y = y * 10;
+
+                                Sdl.RenderDrawRect(mainRenderer, ref pixel);
+                                Sdl.RenderFillRect(mainRenderer, ref pixel);
+                            }
+                        }
+                    }
+
+                    Sdl.SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
+
+                    Sdl.RenderPresent(mainRenderer);
+
                     accumulator -= dt;
                     t += dt;
                 }
-
-                // Update screen
-                Sdl.RenderClear(mainRenderer);
-
-                Sdl.SetRenderDrawColor(mainRenderer, 255, 255, 255, 255);
-
-                Sdl.RenderDrawRect(mainRenderer, ref pixel);
-                Sdl.RenderFillRect(mainRenderer, ref pixel);
-
-                Sdl.SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
-
-                Sdl.RenderPresent(mainRenderer);
             }
 
             // Terminate SDL
@@ -219,7 +269,7 @@ namespace BeagleChipper
                 * In some cases, such as when an instruction needs to be skipped, the Program Counter will have
                 * Been increased by 4 in total during a single instruction.
                 */
-            ProgramCounter += 2;
+            //ProgramCounter += 2;
 
             // Update timers
             if (DelayTimer > 0)
@@ -383,42 +433,38 @@ namespace BeagleChipper
             // Reset VF
             Registers[0xF] = 0;
 
-            // Read sprite from memory which needs to be rendered
-            byte[] sprite = new byte[height];
-            Array.Copy(Memory, I, sprite, 0, height);
-
-            for (int yLine = 0; yLine < height; yLine++)
+            ushort pixel = 0;
+            for (int yline = 0; yline < height; yline++)
             {
-                byte pixelRow = Memory[I + yLine];
-                for (int xLine = 0; xLine < 8; xLine++)
+                pixel = Memory[I + yline];
+                for (int xline = 0; xline < 8; xline++)
                 {
-                    byte pixel = (byte)((pixelRow & (0x80 >> xLine)) >> (7 - xLine));
-
-                    byte displayPixel = DisplayMemory[((coordinateY + yLine) * 8) + (coordinateX + xLine)];
-
-                    if (displayPixel == 1 && pixel == 1)
+                    if ((pixel & (0x80 >> xline)) != 0)
                     {
-                        DisplayMemory[((coordinateY + yLine) * 8) + (coordinateX + xLine)] = 0;
-                        Registers[0xF] = 1;
-                    }
-                    else
-                    {
-                        DisplayMemory[((coordinateY + yLine) * 8) + (coordinateX + xLine)] = pixel;
-                        Registers[0xF] = 0;
+                        if (DisplayMemory[(coordinateX + xline + ((coordinateY + yline) * 64))] == 1)
+                            Registers[0xF] = 1;
+
+                        DisplayMemory[coordinateX + xline + ((coordinateY + yline) * 64)] ^= 1;
                     }
                 }
             }
+
+            ProgramCounter += 2;
         }
 
         private static void ClearDisplay()
         {
             Array.Clear(DisplayMemory, 0, DisplayMemory.Length);
+
+            ProgramCounter += 2;
         }
 
         private static void ReturnFromSubroutine(ushort operationCode)
         {
             ProgramCounter = Stack[StackPointer];
             StackPointer--;
+
+            Console.WriteLine("Returns from subroutine to ProgramCounter: " + ProgramCounter);
         }
 
         private static void JumpToSubRoutine(ushort operationCode)
@@ -426,6 +472,8 @@ namespace BeagleChipper
             StackPointer++;
             Stack[StackPointer] = ProgramCounter;
             ProgramCounter = (ushort)(operationCode & 0x0FFF);
+
+            Console.WriteLine("Jumping to subroutine from ProgramCounter: " + ProgramCounter);
         }
         
         private static void SetRegisterToValue(ushort operationCode)
@@ -434,6 +482,8 @@ namespace BeagleChipper
             byte register = (byte) ((operationCode & 0x0F00) >> 8);
 
             Registers[register] = value;
+
+            ProgramCounter += 2;
         }
 
         private static void AddValueToRegister(ushort operationCode)
@@ -442,6 +492,8 @@ namespace BeagleChipper
             byte register = (byte)((operationCode & 0x0F00) >> 8);
 
             Registers[register] += value;
+
+            ProgramCounter += 2;
         }
 
         private static void CopyRegisterValueToOtherRegister(ushort operationCode)
@@ -450,6 +502,8 @@ namespace BeagleChipper
             byte registerX = (byte) ((operationCode & 0x0F00) >> 8);
 
             Registers[registerX] = Registers[registerY];
+
+            ProgramCounter += 2;
         }
 
         private static void SkipInstructionIfRegisterValueEqualToCompareValue(ushort operationCode)
@@ -461,6 +515,8 @@ namespace BeagleChipper
             {
                 ProgramCounter += 2;
             }
+
+            ProgramCounter += 2;
         }
 
         private static void SkipInstructionIfRegisterValueNotEqualToCompareValue(ushort operationCode)
@@ -470,6 +526,8 @@ namespace BeagleChipper
 
             if (Registers[register] != compareValue)
                 ProgramCounter += 2;
+
+            ProgramCounter += 2;
         }
 
         private static void SkipInstructionIfRegistersAreEqual(ushort operationCode)
@@ -479,6 +537,8 @@ namespace BeagleChipper
 
             if (Registers[registerX] == Registers[registerY])
                 ProgramCounter += 2;
+
+            ProgramCounter += 2;
         }
 
         private static void BitwiseOr(ushort operationCode)
@@ -492,6 +552,11 @@ namespace BeagleChipper
             registerXValue = (byte)(registerXValue | registerYValue);
 
             Registers[registerX] = registerXValue;
+
+            // TODO: Is this right?
+            Registers[0xF] = 0;
+
+            ProgramCounter += 2;
         }
 
         private static void BitwiseAnd(ushort operationCode)
@@ -505,6 +570,11 @@ namespace BeagleChipper
             registerXValue = (byte)(registerXValue & registerYValue);
 
             Registers[registerX] = registerXValue;
+
+            // TODO: Is this right?
+            Registers[0xF] = 0;
+
+            ProgramCounter += 2;
         }
 
         private static void ExclusiveOr(ushort operationCode)
@@ -518,6 +588,11 @@ namespace BeagleChipper
             registerXValue = (byte)(registerXValue ^ registerYValue);
 
             Registers[registerX] = registerXValue;
+
+            // TODO: Is this right?
+            Registers[0xF] = 0;
+
+            ProgramCounter += 2;
         }
 
         private static void AddAndCarry(ushort operationCode)
@@ -531,6 +606,8 @@ namespace BeagleChipper
                 Registers[0xF] = 0;
 
             Registers[registerX] += Registers[registerY];
+
+            ProgramCounter += 2;
         }
 
         private static void SubtractAndBorrow(ushort operationCode)
@@ -544,6 +621,8 @@ namespace BeagleChipper
                 Registers[0xF] = 0;
 
             Registers[registerX] -= Registers[registerY];
+
+            ProgramCounter += 2;
         }
 
         private static void SubtractAndNotBorrow(ushort operationCode)
@@ -556,7 +635,9 @@ namespace BeagleChipper
             else
                 Registers[0xF] = 0;
 
-            Registers[registerX] -= Registers[registerY];
+            Registers[registerX] = (byte)(Registers[registerY] - Registers[registerX]);
+
+            ProgramCounter += 2;
         }
 
         private static void SHR(ushort operationCode)
@@ -568,14 +649,18 @@ namespace BeagleChipper
             else
                 Registers[0xF] = 0;
 
-            Registers[registerX] /= 2;
+            Registers[registerX] = (byte)(Registers[registerX] >> 1);
+
+            ProgramCounter += 2;
         }
 
         private static void ShiftLeft(ushort operationCode)
         {
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
-            Registers[0xF] = (byte)(Registers[registerX] & 0b1000_0000);
-            Registers[registerX] = (byte)(Registers[registerX] << 1);
+            Registers[0xF] = (byte)((Registers[registerX] & 0b1000_0000) >> 7);
+            Registers[registerX] *= 2;
+
+            ProgramCounter += 2;
         }
 
         private static void SkipInstructionIfVxNotEqualVy(ushort operationCode)
@@ -585,36 +670,48 @@ namespace BeagleChipper
 
             if (Registers[registerX] != Registers[registerY])
                 ProgramCounter += 2;
+
+            ProgramCounter += 2;
         }
 
         private static void SetIToAddress(ushort operationCode)
         {
             ushort registerValue = (ushort) (operationCode & 0x0FFF);
             I = registerValue;
+
+            ProgramCounter += 2;
         }
 
         private static void JumpToAddress(ushort operationCode)
         {
             ushort address = (ushort)(operationCode & 0x0FFF);
             ProgramCounter = (ushort)(Registers[0] + address);
-        }
 
+            //Console.WriteLine("Jumping to adress: " + add);
+        }
+        private static Random newRand = new Random(645646);
         private static void Rand(ushort opearionCode)
         {
             byte registerX = (byte)((opearionCode & 0x0F00) >> 8);
             byte theValue = (byte)(opearionCode & 0x00FF);
-            Random newRand = new Random();
-            Registers[registerX] = (byte)(newRand.Next(0, 255) & theValue);
+
+            byte theRander = (byte)newRand.Next(0, 256);
+
+            Registers[registerX] = (byte)(theRander & theValue);
+
+            ProgramCounter += 2;
         }
 
         private static void SkipIfKeyPressed(ushort operationCode)
         {
             Console.WriteLine("SkipIfKeyPressed Instruction not implemented...");
+            ProgramCounter += 2;
         }
 
         private static void SkipIfKeyNotPressed(ushort operationCode)
         {
             Console.WriteLine("SkipIfKeyNotPressed Instruction not implemented...");
+            ProgramCounter += 2;
         }
 
         private static void SetVxToDelayTimerValue(ushort operationCode)
@@ -622,6 +719,8 @@ namespace BeagleChipper
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
 
             Registers[registerX] = DelayTimer;
+
+            ProgramCounter += 2;
         }
 
         private static void GetKeyPressAndStoreInVx(ushort operationCode)
@@ -633,18 +732,24 @@ namespace BeagleChipper
         {
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
             DelayTimer = Registers[registerX];
+
+            ProgramCounter += 2;
         }
 
         private static void SetSoundTimerToVx(ushort operationCode)
         {
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
             SoundTimer = Registers[registerX];
+
+            ProgramCounter += 2;
         }
 
         private static void AddVxToI(ushort operationCode)
         {
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
-            I += registerX;
+            I += Registers[registerX];
+
+            ProgramCounter += 2;
         }
 
         private static void Bcd(ushort operationCode)
@@ -660,6 +765,8 @@ namespace BeagleChipper
             Memory[I] = mostSignificantDigit;
             Memory[I + 1] = middleDigit;
             Memory[I + 2] = onesDigit;
+
+            ProgramCounter += 2;
         }
 
         private static void RegisterDump(ushort operationCode)
@@ -670,6 +777,9 @@ namespace BeagleChipper
             {
                 Memory[I + x] = Registers[x];
             }
+            
+            ProgramCounter += 2;
+            //I = (ushort)(I + registerX + 1);
         }
 
         private static void RegisterLoad(ushort operationCode)
@@ -680,6 +790,10 @@ namespace BeagleChipper
             {
                 Registers[x] = Memory[I + x];
             }
+
+            ProgramCounter += 2;
+
+            //I = (ushort)(I + registerX + 1);
         }
 
         private static void SetIToLocationOfCharacterSprite(ushort operationCode)
@@ -689,6 +803,10 @@ namespace BeagleChipper
             byte registerXValue = Registers[registerX];
 
             I = (ushort)(registerXValue * 0x05);
+
+            ProgramCounter += 2;
+
+            Console.WriteLine("Drawing character sprite");
         }
 
         private static void LoadProgram(string filepath, byte[] memory)
