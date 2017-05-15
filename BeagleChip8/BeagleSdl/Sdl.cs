@@ -7,6 +7,7 @@ namespace BeagleSdl
     public struct SdlEvent
     {
         [FieldOffset(0)] public UInt32 Type;
+        [FieldOffset(0)] public SDLKeyboardEvent Key;
         [FieldOffset(0)] public SdlQuitEvent Quit;
     }
 
@@ -24,6 +25,48 @@ namespace BeagleSdl
         public int Y;
         public int W;
         public int H;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SDLKeyboardEvent
+    {
+        public uint Type;
+        public uint Timestamp;
+        public uint WindowId;
+        public byte State;
+        public byte Repeat;
+        public SDLKeySym KeySym;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SDLKeySym
+    {
+        public int Scancode; // Not used right now
+        public SDLKeyCode Sym;
+        public ushort Mod;
+        public int Unusued; // Unused field
+    }
+    
+    public enum SDLKeyCode
+    {
+        SdlScancodeSpace = ' ',
+        A = 'a',
+        B = 'b',
+        C = 'c',
+        D = 'd',
+        W = 'w',
+        S = 's',
+        Q = 'q',
+        E = 'e',
+        Z = 'z',
+        X = 'x',
+        R = 'r',
+        F = 'f',
+        V = 'v',
+        Key1 = '1',
+        Key2 = '2',
+        Key3 = '3',
+        Key4 = '4',
     }
 
     public enum InitializationFlags
@@ -47,7 +90,9 @@ namespace BeagleSdl
 
     public enum EventType
     {
-        Quit = 0x100
+        Quit = 0x100,
+        KeyDown = 0x300,
+        KeyUp = 0x301
     }
 
     public static class Sdl

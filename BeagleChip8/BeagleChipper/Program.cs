@@ -130,6 +130,12 @@ namespace BeagleChipper
          */
         private static readonly byte[] DisplayMemory = new byte[64 * 32];
 
+        private static readonly byte[] KeyboardState = new byte[0xF];
+
+        private static bool keyPressOccoured = false;
+
+        private static ushort previousKeyPress = 0x0;
+
         static void Main(string[] args)
         {
             /*
@@ -162,7 +168,7 @@ namespace BeagleChipper
             Array.Copy(Fontset, Memory, Fontset.Length);
 
             // Load program
-            LoadProgram("INVADERS.ch8", Memory);
+            LoadProgram("PONG.ch8", Memory);
 
             // Initialize SDL
             Sdl.Init((int)InitializationFlags.Video);
@@ -188,7 +194,7 @@ namespace BeagleChipper
             
             // Loop variables
             double t = 0.0;
-            const double dt = 1.0 / 60.0;
+            const double dt = 1.0 / 120.0;
 
             double currentTime = Sdl.GetTicks() / 1000.0;
             double accumulator = 0.0;
@@ -208,48 +214,174 @@ namespace BeagleChipper
                 while (Sdl.PollEvent(out currentEvent) == 1)
                 {
                     if (currentEvent.Type == (int)EventType.Quit)
+                    {
                         isRunning = false;
+                    }
+                    else if (currentEvent.Type == (int)EventType.KeyDown)
+                    {
+                        switch (currentEvent.Key.KeySym.Sym)
+                        {
+                        case SDLKeyCode.A:
+                            KeyboardState[4] = 1;
+                            break;
+                        case SDLKeyCode.D:
+                            KeyboardState[6] = 1;
+                            break;
+                        case SDLKeyCode.W:
+                            KeyboardState[2] = 1;
+                            break;
+                        case SDLKeyCode.SdlScancodeSpace:
+                        case SDLKeyCode.S:
+                            KeyboardState[5] = 1;
+                            break;
+                        case SDLKeyCode.Q:
+                            KeyboardState[1] = 1;
+                            break;
+                        case SDLKeyCode.E:
+                            KeyboardState[3] = 1;
+                            break;
+                        case SDLKeyCode.Z:
+                            KeyboardState[7] = 1;
+                            break;
+                        case SDLKeyCode.X:
+                            KeyboardState[8] = 1;
+                            break;
+                        case SDLKeyCode.C:
+                            KeyboardState[9] = 1;
+                            break;
+                        case SDLKeyCode.R:
+                            KeyboardState[0xC] = 1;
+                            break;
+                        case SDLKeyCode.F:
+                            KeyboardState[0xD] = 1;
+                            break;
+                        case SDLKeyCode.V:
+                            KeyboardState[0xE] = 1;
+                            break;
+                        case SDLKeyCode.Key1:
+                            KeyboardState[0xA] = 1;
+                            break;
+                        case SDLKeyCode.Key2:
+                            KeyboardState[0x0] = 1;
+                            break;
+                        case SDLKeyCode.Key3:
+                            KeyboardState[0xB] = 1;
+                            break;
+                        case SDLKeyCode.Key4:
+                            KeyboardState[0xF] = 1;
+                            break;
+                        }
+                    } else if (currentEvent.Type == (int) EventType.KeyUp)
+                    {
+                        switch (currentEvent.Key.KeySym.Sym)
+                        {
+                            case SDLKeyCode.A:
+                                KeyboardState[4] = 0;
+                                break;
+                            case SDLKeyCode.D:
+                                KeyboardState[6] = 0;
+                                break;
+                            case SDLKeyCode.W:
+                                KeyboardState[2] = 0;
+                                break;
+                            case SDLKeyCode.SdlScancodeSpace:
+                            case SDLKeyCode.S:
+                                KeyboardState[5] = 0;
+                                break;
+                            case SDLKeyCode.Q:
+                                KeyboardState[1] = 0;
+                                break;
+                            case SDLKeyCode.E:
+                                KeyboardState[3] = 0;
+                                break;
+                            case SDLKeyCode.Z:
+                                KeyboardState[7] = 0;
+                                break;
+                            case SDLKeyCode.X:
+                                KeyboardState[8] = 0;
+                                break;
+                            case SDLKeyCode.C:
+                                KeyboardState[9] = 0;
+                                break;
+                            case SDLKeyCode.R:
+                                KeyboardState[0xC] = 0;
+                                break;
+                            case SDLKeyCode.F:
+                                KeyboardState[0xD] = 0;
+                                break;
+                            case SDLKeyCode.V:
+                                KeyboardState[0xE] = 0;
+                                break;
+                            case SDLKeyCode.Key1:
+                                KeyboardState[0xA] = 0;
+                                break;
+                            case SDLKeyCode.Key2:
+                                KeyboardState[0x0] = 0;
+                                break;
+                            case SDLKeyCode.Key3:
+                                KeyboardState[0xB] = 0;
+                                break;
+                            case SDLKeyCode.Key4:
+                                KeyboardState[0xF] = 0;
+                                break;
+                        }
+                    }
                 }
+
+                ExecuteCycle(mainRenderer);
 
                 while (accumulator >= dt)
                 {
-                    ExecuteCycle();
+                    // Update timers
+                    if (DelayTimer > 0)
+                        DelayTimer -= 1;
 
-                    Sdl.RenderClear(mainRenderer);
-
-                    Sdl.SetRenderDrawColor(mainRenderer, 255, 255, 255, 255);
-
-                    for (int y = 0; y < 32; y++)
-                    {
-                        for (int x = 0; x < 64; x++)
-                        {
-                            byte pixelValue = DisplayMemory[(y * 64) + x];
-
-                            if (pixelValue == 1)
-                            {
-                                pixel.X = x * 10;
-                                pixel.Y = y * 10;
-
-                                Sdl.RenderDrawRect(mainRenderer, ref pixel);
-                                Sdl.RenderFillRect(mainRenderer, ref pixel);
-                            }
-                        }
-                    }
-
-                    Sdl.SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
-
-                    Sdl.RenderPresent(mainRenderer);
+                    if (SoundTimer > 0)
+                        SoundTimer -= 1;
 
                     accumulator -= dt;
                     t += dt;
                 }
+
+                Sdl.SetRenderDrawColor(mainRenderer, 255, 255, 255, 255);
+
+                for (int y = 0; y < 32; y++)
+                {
+                    for (int x = 0; x < 64; x++)
+                    {
+                        byte pixelValue = DisplayMemory[(y * 64) + x];
+
+                        if (pixelValue == 1)
+                        {
+                            pixel.X = x * 10;
+                            pixel.Y = y * 10;
+
+                            Sdl.RenderDrawRect(mainRenderer, ref pixel);
+                            Sdl.RenderFillRect(mainRenderer, ref pixel);
+                        }
+                        else
+                        {
+                            pixel.X = x * 10;
+                            pixel.Y = y * 10;
+
+                            Sdl.SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
+                            Sdl.RenderDrawRect(mainRenderer, ref pixel);
+                            Sdl.RenderFillRect(mainRenderer, ref pixel);
+                            Sdl.SetRenderDrawColor(mainRenderer, 255, 255, 255, 255);
+                        }
+                    }
+                }
+
+                Sdl.SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
+
+                Sdl.RenderPresent(mainRenderer);
             }
 
             // Terminate SDL
             Sdl.Quit();
         }
 
-        private static void ExecuteCycle()
+        private static void ExecuteCycle(IntPtr mainRenderer)
         {
             /*
             * Fetch opcode.
@@ -260,7 +392,7 @@ namespace BeagleChipper
             ushort opcode = (ushort)((Memory[ProgramCounter] << 8) | (Memory[ProgramCounter + 1]));
 
             // Handle the fetched operation code
-            HandleOperationCode(opcode);
+            HandleOperationCode(opcode, mainRenderer);
 
             /*
                 * Since every instruction is 2 bytes long, we need to increment the program counter by two
@@ -269,17 +401,9 @@ namespace BeagleChipper
                 * In some cases, such as when an instruction needs to be skipped, the Program Counter will have
                 * Been increased by 4 in total during a single instruction.
                 */
-            //ProgramCounter += 2;
-
-            // Update timers
-            if (DelayTimer > 0)
-                DelayTimer--;
-
-            if (SoundTimer > 0)
-                SoundTimer--;
         }
 
-        private static void HandleOperationCode(ushort operationCode)
+        private static void HandleOperationCode(ushort operationCode, IntPtr mainRenderer)
         {
             switch (operationCode & 0xF000)
             {
@@ -287,7 +411,7 @@ namespace BeagleChipper
                     switch (operationCode)
                     {
                         case (int)OperationCode.ClearDisplay:
-                            ClearDisplay();
+                            ClearDisplay(mainRenderer);
                             break;
                         case 0x00EE: // Return from a subroutine
                             ReturnFromSubroutine(operationCode);
@@ -430,7 +554,6 @@ namespace BeagleChipper
             byte coordinateY = Registers[registerY];
             byte height = (byte)(operationCode & 0x000F);
 
-            // Reset VF
             Registers[0xF] = 0;
 
             ushort pixel = 0;
@@ -452,8 +575,9 @@ namespace BeagleChipper
             ProgramCounter += 2;
         }
 
-        private static void ClearDisplay()
+        private static void ClearDisplay(IntPtr mainRenderer)
         {
+            Sdl.RenderClear(mainRenderer);
             Array.Clear(DisplayMemory, 0, DisplayMemory.Length);
 
             ProgramCounter += 2;
@@ -463,17 +587,14 @@ namespace BeagleChipper
         {
             ProgramCounter = Stack[StackPointer];
             StackPointer--;
-
-            Console.WriteLine("Returns from subroutine to ProgramCounter: " + ProgramCounter);
+            ProgramCounter += 2;
         }
 
         private static void JumpToSubRoutine(ushort operationCode)
         {
             StackPointer++;
-            Stack[StackPointer] = ProgramCounter;
+            Stack[StackPointer] = (ushort)(ProgramCounter);
             ProgramCounter = (ushort)(operationCode & 0x0FFF);
-
-            Console.WriteLine("Jumping to subroutine from ProgramCounter: " + ProgramCounter);
         }
         
         private static void SetRegisterToValue(ushort operationCode)
@@ -510,7 +631,7 @@ namespace BeagleChipper
         {
             ushort register = (byte)((operationCode & 0x0F00) >> 8);
             ushort compareValue = (byte)(operationCode & 0x00FF);
-
+            
             if (Registers[register] == compareValue)
             {
                 ProgramCounter += 2;
@@ -553,9 +674,6 @@ namespace BeagleChipper
 
             Registers[registerX] = registerXValue;
 
-            // TODO: Is this right?
-            Registers[0xF] = 0;
-
             ProgramCounter += 2;
         }
 
@@ -571,9 +689,6 @@ namespace BeagleChipper
 
             Registers[registerX] = registerXValue;
 
-            // TODO: Is this right?
-            Registers[0xF] = 0;
-
             ProgramCounter += 2;
         }
 
@@ -588,9 +703,6 @@ namespace BeagleChipper
             registerXValue = (byte)(registerXValue ^ registerYValue);
 
             Registers[registerX] = registerXValue;
-
-            // TODO: Is this right?
-            Registers[0xF] = 0;
 
             ProgramCounter += 2;
         }
@@ -615,7 +727,7 @@ namespace BeagleChipper
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
             byte registerY = (byte)((operationCode & 0x00F0) >> 4);
 
-            if (Registers[registerX] > Registers[registerY])
+            if (Registers[registerX] >= Registers[registerY])
                 Registers[0xF] = 1;
             else
                 Registers[0xF] = 0;
@@ -630,7 +742,7 @@ namespace BeagleChipper
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
             byte registerY = (byte)((operationCode & 0x00F0) >> 4);
 
-            if (Registers[registerY] > Registers[registerX])
+            if (Registers[registerY] >= Registers[registerX])
                 Registers[0xF] = 1;
             else
                 Registers[0xF] = 0;
@@ -644,7 +756,7 @@ namespace BeagleChipper
         {
             byte registerX = (byte) ((operationCode & 0x0F00) >> 8);
 
-            if ((Registers[registerX] & 0b00000001) == 1)
+            if ((Registers[registerX] & 0b0000_0001) == 1)
                 Registers[0xF] = 1;
             else
                 Registers[0xF] = 0;
@@ -658,7 +770,7 @@ namespace BeagleChipper
         {
             byte registerX = (byte)((operationCode & 0x0F00) >> 8);
             Registers[0xF] = (byte)((Registers[registerX] & 0b1000_0000) >> 7);
-            Registers[registerX] *= 2;
+            Registers[registerX] = (byte)(Registers[registerX] << 1);
 
             ProgramCounter += 2;
         }
@@ -686,8 +798,6 @@ namespace BeagleChipper
         {
             ushort address = (ushort)(operationCode & 0x0FFF);
             ProgramCounter = (ushort)(Registers[0] + address);
-
-            //Console.WriteLine("Jumping to adress: " + add);
         }
         private static Random newRand = new Random(645646);
         private static void Rand(ushort opearionCode)
@@ -695,7 +805,7 @@ namespace BeagleChipper
             byte registerX = (byte)((opearionCode & 0x0F00) >> 8);
             byte theValue = (byte)(opearionCode & 0x00FF);
 
-            byte theRander = (byte)newRand.Next(0, 256);
+            byte theRander = (byte)newRand.Next(0, 255);
 
             Registers[registerX] = (byte)(theRander & theValue);
 
@@ -704,13 +814,23 @@ namespace BeagleChipper
 
         private static void SkipIfKeyPressed(ushort operationCode)
         {
-            Console.WriteLine("SkipIfKeyPressed Instruction not implemented...");
+            byte registerX = (byte)((operationCode & 0x0F00) >> 8);
+            byte keycode = Registers[registerX];
+
+            if (KeyboardState[keycode] == 1)
+                ProgramCounter += 2;
+
             ProgramCounter += 2;
         }
 
         private static void SkipIfKeyNotPressed(ushort operationCode)
         {
-            Console.WriteLine("SkipIfKeyNotPressed Instruction not implemented...");
+            byte registerX = (byte)((operationCode & 0x0F00) >> 8);
+            byte keycode = Registers[registerX];
+
+            if (KeyboardState[keycode] == 0)
+                ProgramCounter += 2;
+
             ProgramCounter += 2;
         }
 
@@ -726,6 +846,10 @@ namespace BeagleChipper
         private static void GetKeyPressAndStoreInVx(ushort operationCode)
         {
             Console.WriteLine("GetKeyPressAndStoreInVx Instruction not implemented...");
+
+
+
+            ProgramCounter += 2;
         }
 
         private static void SetDelayTimerToVx(ushort operationCode)
@@ -779,7 +903,6 @@ namespace BeagleChipper
             }
             
             ProgramCounter += 2;
-            //I = (ushort)(I + registerX + 1);
         }
 
         private static void RegisterLoad(ushort operationCode)
@@ -792,8 +915,6 @@ namespace BeagleChipper
             }
 
             ProgramCounter += 2;
-
-            //I = (ushort)(I + registerX + 1);
         }
 
         private static void SetIToLocationOfCharacterSprite(ushort operationCode)
@@ -805,8 +926,6 @@ namespace BeagleChipper
             I = (ushort)(registerXValue * 0x05);
 
             ProgramCounter += 2;
-
-            Console.WriteLine("Drawing character sprite");
         }
 
         private static void LoadProgram(string filepath, byte[] memory)
