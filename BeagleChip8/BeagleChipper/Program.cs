@@ -3,41 +3,6 @@ using System.IO;
 using BeagleChipper.Models;
 using BeagleSdl;
 
-/*
-ushort draw1 = 0xF029;
-HandleOperationCode(draw1);
-
-Registers[4] = 0;
-Registers[5] = 0;
-
-ushort drawingOp1 = 0xD455;
-HandleOperationCode(drawingOp1);
-
-ushort draw2 = 0xF129;
-HandleOperationCode(draw2);
-
-Registers[4] = 5;
-Registers[5] = 0;
-
-HandleOperationCode(drawingOp1);
-
-ushort draw3 = 0xF229;
-HandleOperationCode(draw3);
-
-Registers[4] = 20;
-Registers[5] = 0;
-
-HandleOperationCode(drawingOp1);
-
-ushort draw4 = 0xF329;
-HandleOperationCode(draw4);
-
-Registers[4] = 30;
-Registers[5] = 0;
-
-HandleOperationCode(drawingOp1);
-*/
-
 namespace BeagleChipper
 {
     class Program
