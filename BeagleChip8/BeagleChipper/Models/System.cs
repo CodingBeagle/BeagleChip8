@@ -7,35 +7,192 @@ namespace BeagleChipper.Models
 {
     public class System
     {
+        public bool IsRunning { get; private set; }
+
         private readonly Cpu _cpu;
         private readonly Gpu _gpu;
         private readonly Ram _ram;
         private readonly Keyboard _keyboard;
         private readonly IntPtr _renderer;
-        
+        private readonly double _timestep;
+        private double _previouslyRecordedTime;
+        private double _accumulator;
+        private double _frameTime;
+        private double _currentTime;
+
         public System(IntPtr renderer,
-                        Cpu cpu,
-                        Gpu gpu,
-                        Ram ram,
-                        Keyboard keyboard)
+                      Cpu cpu,
+                      Gpu gpu,
+                      Ram ram,
+                      Keyboard keyboard)
         {
+            IsRunning = true;
+
             _cpu = cpu;
             _gpu = gpu;
             _ram = ram;
             _keyboard = keyboard;
             _renderer = renderer;
+
+            _timestep = 1.0 / 60.0;
+            _previouslyRecordedTime = Sdl.GetTicks() / 1000.0;
+            _accumulator = 0.0;
+            _frameTime = 0.0;
         }
 
-        public void ExecuteInstructionCycle()
+        public void Run()
         {
-            ushort operationCode = _ram.GetProgramInstruction(_cpu.ProgramCounter);
-            HandleOperationCode(operationCode);
+            while (IsRunning)
+            {
+                UpdateLoopVariables();
+                HandleInput();
+                ExecuteInstructionCycle();
+                UpdateSystemTimers();
+                Render();
+            }
         }
 
         public void LoadProgram(string filepath)
         {
             byte[] programData = File.ReadAllBytes(filepath);
             _ram.LoadRangeToRam(programData);
+        }
+
+        private void ExecuteInstructionCycle()
+        {
+            ushort operationCode = _ram.GetProgramInstruction(_cpu.ProgramCounter);
+            HandleOperationCode(operationCode);
+        }
+
+        private void Render()
+        {
+            SDLRect pixel = new SDLRect { H = 10, W = 10, X = 0, Y = 0 };
+
+            Sdl.SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+
+            for (int y = 0; y < 32; y++)
+            {
+                for (int x = 0; x < 64; x++)
+                {
+                    byte pixelValue = _gpu.Memory[(y * 64) + x];
+
+                    if (pixelValue == 1)
+                    {
+                        pixel.X = x * 10;
+                        pixel.Y = y * 10;
+
+                        Sdl.RenderDrawRect(_renderer, ref pixel);
+                        Sdl.RenderFillRect(_renderer, ref pixel);
+                    }
+                    else
+                    {
+                        pixel.X = x * 10;
+                        pixel.Y = y * 10;
+
+                        Sdl.SetRenderDrawColor(_renderer, 0, 0, 0, 255);
+                        Sdl.RenderDrawRect(_renderer, ref pixel);
+                        Sdl.RenderFillRect(_renderer, ref pixel);
+                        Sdl.SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+                    }
+                }
+            }
+
+            Sdl.SetRenderDrawColor(_renderer, 0, 0, 0, 255);
+
+            Sdl.RenderPresent(_renderer);
+        }
+
+        private void UpdateLoopVariables()
+        {
+            _currentTime = Sdl.GetTicks() / 1000.0;
+            _frameTime = _currentTime - _previouslyRecordedTime;
+            _previouslyRecordedTime = _currentTime;
+
+            _accumulator += _frameTime;
+        }
+
+        private void UpdateSystemTimers()
+        {
+            while (_accumulator >= _timestep)
+            {
+                // Update timers
+                if (_cpu.DelayTimer > 0)
+                    _cpu.DelayTimer -= 1;
+
+                if (_cpu.SoundTimer > 0)
+                    _cpu.SoundTimer -= 1;
+
+                _accumulator -= _timestep;
+            }
+        }
+
+        private void HandleInput()
+        {
+            SdlEvent currentEvent;
+            while (Sdl.PollEvent(out currentEvent) == 1)
+            {
+                if (currentEvent.Type == (int)EventType.Quit)
+                {
+                    IsRunning = false;
+                }
+                else if (currentEvent.Type == (int)EventType.KeyDown || currentEvent.Type == (int)EventType.KeyUp)
+                {
+                    byte keyValue = currentEvent.Type == (int)EventType.KeyDown ? (byte)1 : (byte)0;
+
+                    switch (currentEvent.Key.KeySym.Sym)
+                    {
+                        case SDLKeyCode.A:
+                            _keyboard.SetKeyboardState(4, keyValue);
+                            break;
+                        case SDLKeyCode.D:
+                            _keyboard.SetKeyboardState(6, keyValue);
+                            break;
+                        case SDLKeyCode.W:
+                            _keyboard.SetKeyboardState(2, keyValue);
+                            break;
+                        case SDLKeyCode.SdlScancodeSpace:
+                        case SDLKeyCode.S:
+                            _keyboard.SetKeyboardState(5, keyValue);
+                            break;
+                        case SDLKeyCode.Q:
+                            _keyboard.SetKeyboardState(1, keyValue);
+                            break;
+                        case SDLKeyCode.E:
+                            _keyboard.SetKeyboardState(3, keyValue);
+                            break;
+                        case SDLKeyCode.Z:
+                            _keyboard.SetKeyboardState(7, keyValue);
+                            break;
+                        case SDLKeyCode.X:
+                            _keyboard.SetKeyboardState(8, keyValue);
+                            break;
+                        case SDLKeyCode.C:
+                            _keyboard.SetKeyboardState(9, keyValue);
+                            break;
+                        case SDLKeyCode.R:
+                            _keyboard.SetKeyboardState(0xC, keyValue);
+                            break;
+                        case SDLKeyCode.F:
+                            _keyboard.SetKeyboardState(0xD, keyValue);
+                            break;
+                        case SDLKeyCode.V:
+                            _keyboard.SetKeyboardState(0xE, keyValue);
+                            break;
+                        case SDLKeyCode.Key1:
+                            _keyboard.SetKeyboardState(0xA, keyValue);
+                            break;
+                        case SDLKeyCode.Key2:
+                            _keyboard.SetKeyboardState(0x0, keyValue);
+                            break;
+                        case SDLKeyCode.Key3:
+                            _keyboard.SetKeyboardState(0xB, keyValue);
+                            break;
+                        case SDLKeyCode.Key4:
+                            _keyboard.SetKeyboardState(0xF, keyValue);
+                            break;
+                    }
+                }
+            }
         }
 
         private void HandleOperationCode(ushort operationCode)
